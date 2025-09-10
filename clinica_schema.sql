@@ -196,3 +196,41 @@ VALUES ('2025-09-10', '09:30:00', 1, 1, 3, 'Chequeo general', '—', 1, 1);
 -- Cambia a bcrypt con PHP cuanto antes (ver archivos PHP incluidos).
 INSERT INTO login (usuario, password_hash, email, id_empleado, id_estado)
 VALUES ('admin', 'admin123', 'admin@clinica.test', 1, 1);
+-- Día de semana: 1=Lunes ... 7=Domingo
+
+CREATE TABLE IF NOT EXISTS horario_medico (
+  id_horario INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_medico INT UNSIGNED NOT NULL,
+  dia_semana TINYINT UNSIGNED NOT NULL CHECK (dia_semana BETWEEN 1 AND 7),
+  hora_inicio TIME NOT NULL,
+  hora_fin TIME NOT NULL,
+  duracion_minutos SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+  CONSTRAINT fk_horario_medico FOREIGN KEY (id_medico) REFERENCES medico(id_medico),
+  UNIQUE KEY uq_horario (id_medico, dia_semana, hora_inicio, hora_fin)
+) ENGINE=InnoDB;
+INSERT IGNORE INTO horario_medico (id_medico, dia_semana, hora_inicio, hora_fin, duracion_minutos)
+VALUES (1, 1, '07:00:00', '15:00:00', 30),
+       (1, 3, '07:00:00', '15:00:00', 30),
+       (1, 5, '07:00:00', '15:00:00', 30);
+
+-- Turno noche Miércoles→Jueves: se modela en el DÍA QUE INICIA (Miércoles=3) de 23:00 a 07:00
+INSERT IGNORE INTO horario_medico (id_medico, dia_semana, hora_inicio, hora_fin, duracion_minutos)
+VALUES (1, 3, '23:00:00', '07:00:00', 30);
+
+ALTER TABLE cita
+  ADD COLUMN duracion_minutos SMALLINT UNSIGNED NOT NULL DEFAULT 30 AFTER hora;
+
+-- Evita duplicar el MISMO slot exacto:
+ALTER TABLE cita
+  ADD UNIQUE KEY uq_cita_medico_slot (id_medico, fecha, hora);
+
+-- (Opcional) Bloqueos puntuales (feriados/ausencias)
+CREATE TABLE IF NOT EXISTS bloqueo_agenda (
+  id_bloqueo INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id_medico INT UNSIGNED NOT NULL,
+  inicio DATETIME NOT NULL,
+  fin DATETIME NOT NULL,
+  motivo VARCHAR(200),
+  CONSTRAINT fk_bloqueo_medico FOREIGN KEY (id_medico) REFERENCES medico(id_medico),
+  INDEX (id_medico, inicio, fin)
+) ENGINE=INNODB;
